@@ -359,7 +359,7 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     orig_offset = offset;
     orig_size = size;
     offset = (offset * HASH_SIZE ) / BLOCK_SIZE;
-    len = (size * HASH_SIZE) / BLOCK_SIZE;
+    void *len = {(size * HASH_SIZE) / BLOCK_SIZE};
     lseek(fh, offset, SEEK_CUR);
     
     char *contents = read(fh, len, HASH_SIZE);
@@ -452,22 +452,23 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
     long long orig_offset = offset;
     offset = (offset * HASH_SIZE ) / BLOCK_SIZE;
     lseek(fh, offset, SEEK_CUR);
+    const int blk_size = 4096;
 
     for (int i=0; i < (sizeof(buf)/BLOCK_SIZE); i++) {
         // hashing
-        unsigned char md[SHA_DIGEST_LENGTH];
-
-        int SHA1_Init(SHA_CTX *context);
+        unsigned char md[HASH_SIZE];
+        SHA_CTX context;
+        SHA1_Init(&context);
         char *buf_ = "";
         for (int j=i; j < BLOCK_SIZE; j++)
         {
             // int SHA1_Update(SHA_CTX *context, j, BLOCK_SIZE);
             buf_ = buf_ + buf[j];
         }
-        int SHA1_Update(SHA_CTX *context, const void *i, BLOCK_SIZE);
+        SHA1_Update(&context, buf_, blk_size);
 
-        int SHA1_Final(md, *context);
-        char *md_ = md + '0';
+        SHA1_Final(md, &context);
+        unsigned char *md_ = md + '0';
         new_buf = new_buf + md_; // hash_blk hash output
         // database insert
         char cmd[512]; 
