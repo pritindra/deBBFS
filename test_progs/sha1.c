@@ -17,8 +17,9 @@ int main () {
         
         SHA1_Final(md, &context);
 	printf("0x");
-	for (int i = 0; i < HASH_SIZE; i++) {
-		printf("%d", md[i]);
-		// putchar('\n');
-	}
+	// for (int i = 0; i < HASH_SIZE; i++) {
+	// 	printf("%d", md[i]);
+	// 	// putchar('\n');
+	// }
+	printf("%s", md);
 }
