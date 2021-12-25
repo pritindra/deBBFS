@@ -338,10 +338,14 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 // can return with anything up to the amount of data requested. nor
 // with the fusexmp code which returns the amount of data also
 // returned by read.
+
+// Function to convert pointer ot integer
 uint64_t PointerToInt(void* ptr){
         uint64_t* u=(void*)&ptr;
         return *u;
     }
+
+
 int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int retstat = 0;
@@ -359,10 +363,11 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     orig_offset = offset;
     orig_size = size;
     offset = (offset * HASH_SIZE ) / BLOCK_SIZE;
-    void *len = {(size * HASH_SIZE) / BLOCK_SIZE};
+    int len = {(size * HASH_SIZE) / BLOCK_SIZE};
     lseek(fh, offset, SEEK_CUR);
     
-    char *contents = read(fh, len, HASH_SIZE);
+    char *contents;
+	read(fh, contents, HASH_SIZE);
 
     sqlite3 *db;
     char *err_msg = 0;
@@ -387,10 +392,25 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
         }
 
         
-        sprintf(cmd,"SELECT * FROM hashes WHERE hash = '%s'",contents_); 
-        rc = sqlite3_exec(db, cmd, callback, 0, &err_msg);
-        act_contents = act_contents + rc;
+        // sprintf(cmd,"SELECT * FROM hashes WHERE hash = '%s'",contents_); 
+        // rc = sqlite3_exec(db, cmd, callback, 0, &err_msg);
+        // act_contents = act_contents + rc;
     }
+	sprintf(cmd,"SELECT * FROM hashes WHERE hash = '%s'",contents_);
+	rc = sqlite3_exec(db, cmd, 0, 0, &err_msg);
+	sqlite3_str *buffer = sqlite3_str_new(db);
+	sqlite3_stmt *statement;
+	while (sqlite3_step(statement) == SQLITE_ROW)
+	{
+		sqlite3_str_appendf(buffer, "%s | %s\n",
+			(const char *)sqlite3_column_text(statement, 0),
+			(const char *)sqlite3_column_text(statement, 1));
+	
+	}
+	char *block = sqlite3_str_finish(buffer);
+	act_contents = block;
+	sqlite3_free(block);
+
     size = orig_size;
     offset = orig_offset;
 
@@ -398,21 +418,21 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     // return log_syscall("pread", pread(fi->fh, buf, size, offset), 0);
 }
 
-int callback(void *, int, char **, char **);
-int callback(void *NotUsed, int argc, char **argv,
-                    char **azColName) {
+// int callback(void *, int, char **, char **);
+// int callback(void *NotUsed, int argc, char **argv,
+//                     char **azColName) {
 
-    NotUsed = 0;
+//     NotUsed = 0;
 
-    for (int i = 0; i < argc; i++) {
+//     for (int i = 0; i < argc; i++) {
 
-        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-    }
+//         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+//     }
 
-    printf("\n");
+//     printf("\n");
 
-    return 0;
-}
+//     return 0;
+// }
 /** Write data to an open file
  *
  * Write should return exactly the number of bytes requested
@@ -465,17 +485,18 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
             // int SHA1_Update(SHA_CTX *context, j, BLOCK_SIZE);
             buf_ = buf_ + buf[j];
         }
-        SHA1_Update(&context, buf_, blk_size);
-
+        SHA1_Update(&context, (uint8_t *)buf_, BLOCK_SIZE);
+        
         SHA1_Final(md, &context);
+
         unsigned char *md_ = md + '0';
-        new_buf = new_buf + md_; // hash_blk hash output
+        // new_buf = new_buf + &md_; // hash_blk hash output
         // database insert
         char cmd[512]; 
         // sql = cmd;
-        sprintf(cmd,"INSERT INTO hashes VALUES ('%s', '%s')(SELECT * FROM hashes WHERE hash = '%s');",md_,buf_,md_);
-        
+		sprintf(cmd,"INSERT INTO hashes VALUES ('%s', '%s')",md_,buf_);        
         rc = sqlite3_exec(db, cmd, 0, 0, &err_msg);
+		md_ = "0";
         
     }
     //return log_syscall("pwrite", pwrite(fi->fh, buf, size, offset), 0);
@@ -506,7 +527,7 @@ int bb_statfs(const char *path, struct statvfs *statv)
     // get stats for underlying filesystem
     retstat = log_syscall("statvfs", statvfs(fpath, statv), 0);
     
-    log_statvfs(statv);
+    log_statvfs(statv); 
     
     return retstat;
 }
