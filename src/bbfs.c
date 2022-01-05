@@ -364,15 +364,16 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     orig_size = size;
     offset = (offset * HASH_SIZE ) / BLOCK_SIZE;
     int len = {(size * HASH_SIZE) / BLOCK_SIZE};
-    lseek(fh, offset, SEEK_CUR);
+    lseek(fh, offset, SEEK_SET);
     
     char *contents;
+	pread(fi->fh, buf, size, offset);
 	read(fh, contents, HASH_SIZE);
 
     sqlite3 *db;
     char *err_msg = 0;
 
-    int rc = sqlite3_open("hash_block.db", &db);
+    int rc = sqlite3_open("../example/hash_block.db", &db);
     if (rc != SQLITE_OK) {
         
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
@@ -459,7 +460,7 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
     sqlite3 *db;
     char *err_msg = 0;
 
-    int rc = sqlite3_open("hash_block.db", &db);
+    int rc = sqlite3_open("../example/hash_block.db", &db);
     if (rc != SQLITE_OK) {
         
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
@@ -471,8 +472,7 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
 
     long long orig_offset = offset;
     offset = (offset * HASH_SIZE ) / BLOCK_SIZE;
-    lseek(fh, offset, SEEK_CUR);
-    const int blk_size = 4096;
+    lseek(fh, offset, SEEK_SET);
 
     for (int i=0; i < (sizeof(buf)/BLOCK_SIZE); i++) {
         // hashing
@@ -499,12 +499,13 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
 		md_ = "0";
         
     }
-    //return log_syscall("pwrite", pwrite(fi->fh, buf, size, offset), 0);
     sqlite3_close(db);
     
-    write(fh, new_buf, BLOCK_SIZE);
+    //write(fh, new_buf, BLOCK_SIZE);
+	pwrite(fi->fh, buf, size, offset);
     offset = orig_offset;
     return sizeof(buf); 
+    // return log_syscall("pwrite", pwrite(fi->fh, buf, size, offset), 0);
 }
 
 
